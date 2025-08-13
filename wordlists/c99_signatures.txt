@@ -1,0 +1,280 @@
+# C99 Shell Signatures and Detection Patterns
+# These signatures help identify C99 shells in web responses
+
+# Common C99 Shell Identifiers
+c99shell
+C99Shell
+C99 Shell
+c99 shell
+Shell v
+Coded by
+Orb Networks
+SpiderLabs
+Security team
+$
+$shell_version
+$version
+
+# Safe Mode and Function Indicators
+Safe-mode
+Safe mode
+disable_functions
+Disable functions
+exec disabled
+system disabled
+shell_exec disabled
+Safe mode: OFF
+Safe mode: ON
+
+# PHP Code Execution Functions
+eval(
+system(
+exec(
+shell_exec(
+passthru(
+popen(
+proc_open(
+file_get_contents(
+fwrite(
+fputs(
+fopen(
+readfile(
+move_uploaded_file(
+copy(
+chmod(
+unlink(
+rmdir(
+mkdir(
+
+# Common Interface Elements
+Server vars
+PHP info
+Eval PHP
+Execute
+Command
+Terminal
+File manager
+Upload file
+Download
+Browse
+Directory
+Permissions
+Owner
+Size
+Last modified
+Actions
+Delete
+Rename
+Edit
+View
+Create
+
+# Database Related
+MySQL
+Database
+SQL query
+phpMyAdmin
+Connect
+Connection
+Host
+Username
+Password
+Database name
+Query result
+
+# Network/System Commands
+uname -a
+id;
+pwd;
+ls -la
+cat /etc/passwd
+cat /etc/shadow
+whoami
+ps aux
+netstat
+ifconfig
+route
+w
+last
+history
+df -h
+free -m
+uptime
+
+# Reverse Shell/Backdoor Indicators
+Back connect
+Bind port
+Reverse shell
+nc -l
+/bin/bash
+/bin/sh
+cmd.exe
+powershell
+
+# HTTP Parameters
+$_GET
+$_POST
+$_REQUEST
+$_FILES
+$_SESSION
+$_COOKIE
+$_SERVER
+
+# Encoding/Obfuscation Functions
+base64_decode
+base64_encode
+gzinflate
+gzdeflate
+str_rot13
+urldecode
+rawurldecode
+chr(
+ord(
+hexdec(
+dechex(
+pack(
+unpack(
+
+# File Operations
+Directory listing
+File upload
+File download
+File edit
+File create
+File delete
+Directory create
+Directory delete
+Change permissions
+Change owner
+
+# Security Bypass Indicators
+Bypass
+Exploit
+Vulnerability
+Inject
+Remote
+Local
+Include
+Require
+Allow_url_include
+Magic_quotes
+
+# Common Error Messages
+Warning:
+Fatal error:
+Parse error:
+Notice:
+mysql_connect()
+mysql_query()
+Permission denied
+Access denied
+File not found
+
+# Shell Interface Elements
+Current directory
+Change directory
+Execute command
+Command output
+File browser
+Text editor
+SQL manager
+Process list
+Network info
+System info
+
+# Specific Shell Names and Versions
+r57shell
+WSO
+wso.php
+c100
+b374k
+p0wny
+alfa
+crystal
+devilz
+sadrazam
+indoxploit
+mini shell
+
+# Authentication Elements
+Password
+Login
+Authentication
+Access
+Unauthorized
+Forbidden
+Admin
+Root
+
+# Common Paths in Shells
+/tmp/
+/var/tmp/
+/dev/shm/
+/home/
+/root/
+/etc/
+/usr/
+/var/
+/opt/
+/bin/
+/sbin/
+
+# Tool Indicators
+wget
+curl
+lynx
+fetch
+nc
+netcat
+telnet
+ssh
+ftp
+perl
+python
+ruby
+gcc
+make
+
+# Server Information
+Apache
+nginx
+IIS
+Lighttpd
+Cherokee
+Server version
+PHP version
+MySQL version
+Operating system
+
+# Webshell Activities
+Upload successful
+File uploaded
+Command executed
+Directory changed
+File created
+File deleted
+Permission changed
+Connection established
+
+# Encoded Content Indicators
+==
+PD9waHA
+PCEtLQ
+PCFET0
+aWYgKCEkX
+<?php
+<?=
+<%
+<script
+
+# Common Variable Names
+$cmd
+$command
+$dir
+$file
+$path
+$data
+$content
+$result
+$output
+$response
