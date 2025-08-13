@@ -1,0 +1,44 @@
+{
+    "email_settings": {
+        "smtp_server": "smtp.gmail.com",
+        "smtp_port": 587,
+        "smtp_username": "your_email@gmail.com",
+        "smtp_password": "your_app_password",
+        "sender_email": "scanner@yourlab.com",
+        "recipient_emails": [
+            "admin@yourlab.com",
+            "security@yourlab.com"
+        ],
+        "use_tls": true
+    },
+    "common_smtp_providers": {
+        "gmail": {
+            "smtp_server": "smtp.gmail.com",
+            "smtp_port": 587,
+            "use_tls": true,
+            "note": "Use App Password instead of regular password"
+        },
+        "outlook": {
+            "smtp_server": "smtp-mail.outlook.com",
+            "smtp_port": 587,
+            "use_tls": true
+        },
+        "yahoo": {
+            "smtp_server": "smtp.mail.yahoo.com",
+            "smtp_port": 587,
+            "use_tls": true
+        },
+        "custom_server": {
+            "smtp_server": "mail.yourcompany.com",
+            "smtp_port": 25,
+            "use_tls": false,
+            "note": "For internal mail servers"
+        }
+    },
+    "security_notes": {
+        "app_passwords": "For Gmail, use App Passwords instead of your regular password",
+        "2fa": "Some providers require 2FA to be enabled for SMTP access",
+        "testing": "Test email configuration with a simple email before running scans",
+        "lab_only": "Only use email reporting in authorized lab environments"
+    }
+}

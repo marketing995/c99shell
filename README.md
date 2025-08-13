@@ -22,6 +22,7 @@ A comprehensive tool for detecting C99 web shells on target systems during ethic
 - **Output Logging**: JSON-formatted results with timestamps
 - **Rate Limiting**: Built-in delays to avoid overwhelming target systems
 - **SSL Support**: HTTPS scanning with certificate verification bypass for lab testing
+- **Email Reporting**: Automated HTML email reports with scan results and attachments
 
 ## 📋 Requirements
 
@@ -102,7 +103,12 @@ python3 c99_scanner.py \
   --threads 50 \
   --timeout 10 \
   --output results_$(date +%Y%m%d_%H%M%S).json \
-  --delay 0.2
+  --delay 0.2 \
+  --email-to admin@lab.com security@lab.com \
+  --email-from scanner@lab.com \
+  --smtp-server smtp.gmail.com \
+  --smtp-username your_email@gmail.com \
+  --smtp-password your_app_password
 ```
 
 ### PHP Scanner
@@ -132,6 +138,9 @@ php c99_scanner.php --target 192.168.1.0/24 --delay 0.5
 
 # Custom User-Agent
 php c99_scanner.php --target 192.168.1.0/24 --user-agent "Custom Scanner"
+
+# With email reporting
+php c99_scanner.php --target 192.168.1.0/24 --email-to admin@lab.com security@lab.com --email-from scanner@lab.com
 ```
 
 ## 🎯 Common Scanning Scenarios

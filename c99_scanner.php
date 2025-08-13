@@ -14,6 +14,8 @@ class C99Scanner {
     private $outputFile;
     private $foundShells;
     private $delay;
+    private $emailConfig;
+    private $scanStartTime;
     
     // Common C99 shell paths and filenames
     private $c99Paths = [
@@ -73,13 +75,15 @@ class C99Scanner {
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101'
     ];
     
-    public function __construct($threads = 20, $timeout = 10, $userAgent = null, $outputFile = null, $delay = 0) {
+    public function __construct($threads = 20, $timeout = 10, $userAgent = null, $outputFile = null, $delay = 0, $emailConfig = null) {
         $this->threads = $threads;
         $this->timeout = $timeout;
         $this->userAgent = $userAgent ?: $this->userAgents[array_rand($this->userAgents)];
         $this->outputFile = $outputFile;
         $this->foundShells = [];
         $this->delay = $delay;
+        $this->emailConfig = $emailConfig;
+        $this->scanStartTime = null;
     }
     
     /**
@@ -277,6 +281,140 @@ class C99Scanner {
     }
     
     /**
+     * Send email report with scan results
+     */
+    public function sendEmailReport($scanTarget, $scanDuration, $totalHosts) {
+        if (!$this->emailConfig) {
+            return;
+        }
+        
+        try {
+            $subject = "C99 Shell Scanner Report - " . $scanTarget;
+            $htmlBody = $this->generateHtmlReport($scanTarget, $scanDuration, $totalHosts);
+            
+            // Headers
+            $headers = array();
+            $headers[] = 'MIME-Version: 1.0';
+            $headers[] = 'Content-type: text/html; charset=UTF-8';
+            $headers[] = 'From: ' . $this->emailConfig['sender_email'];
+            $headers[] = 'To: ' . implode(', ', $this->emailConfig['recipient_emails']);
+            
+            // Send to each recipient
+            foreach ($this->emailConfig['recipient_emails'] as $recipient) {
+                $success = mail($recipient, $subject, $htmlBody, implode("\r\n", $headers));
+                if (!$success) {
+                    echo "[-] Failed to send email to: $recipient\n";
+                } else {
+                    echo "[+] Email report sent to: $recipient\n";
+                }
+            }
+            
+        } catch (Exception $e) {
+            echo "[-] Error sending email report: " . $e->getMessage() . "\n";
+        }
+    }
+    
+    /**
+     * Generate HTML email report
+     */
+    public function generateHtmlReport($scanTarget, $scanDuration, $totalHosts) {
+        $currentTime = date('Y-m-d H:i:s');
+        $shellsFound = count($this->foundShells);
+        
+        $html = "<!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                .header { background-color: #f0f0f0; padding: 20px; border-radius: 5px; }
+                .summary { background-color: #e7f3ff; padding: 15px; margin: 20px 0; border-radius: 5px; }
+                .alert { background-color: #ffebee; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 5px solid #f44336; }
+                .success { background-color: #e8f5e8; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 5px solid #4caf50; }
+                .shell-item { background-color: #fff3cd; padding: 10px; margin: 10px 0; border-radius: 3px; border-left: 3px solid #ffc107; }
+                .confidence-high { border-left-color: #dc3545; }
+                .confidence-medium { border-left-color: #fd7e14; }
+                .confidence-low { border-left-color: #ffc107; }
+                table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                .footer { margin-top: 30px; padding: 20px; background-color: #f9f9f9; border-radius: 5px; font-size: 12px; color: #666; }
+            </style>
+        </head>
+        <body>
+            <div class=\"header\">
+                <h1>🔍 C99 Shell Scanner Report</h1>
+                <p><strong>Scan Target:</strong> $scanTarget</p>
+                <p><strong>Scan Date:</strong> $currentTime</p>
+                <p><strong>Duration:</strong> " . number_format($scanDuration, 2) . " seconds</p>
+                <p><strong>Hosts Scanned:</strong> $totalHosts</p>
+            </div>";
+        
+        if (!empty($this->foundShells)) {
+            $highConf = 0;
+            $medConf = 0;
+            $lowConf = 0;
+            
+            foreach ($this->foundShells as $shell) {
+                if ($shell['confidence'] >= 80) $highConf++;
+                elseif ($shell['confidence'] >= 60) $medConf++;
+                else $lowConf++;
+            }
+            
+            $html .= "
+            <div class=\"alert\">
+                <h2>⚠️ SECURITY ALERT: C99 Shells Detected!</h2>
+                <p><strong>$shellsFound potential web shells found</strong></p>
+            </div>
+            
+            <div class=\"summary\">
+                <h3>📊 Detection Summary</h3>
+                <table>
+                    <tr><th>Confidence Level</th><th>Count</th></tr>
+                    <tr><td>High (80%+)</td><td style=\"color: #dc3545; font-weight: bold;\">$highConf</td></tr>
+                    <tr><td>Medium (60-79%)</td><td style=\"color: #fd7e14; font-weight: bold;\">$medConf</td></tr>
+                    <tr><td>Low (50-59%)</td><td style=\"color: #ffc107; font-weight: bold;\">$lowConf</td></tr>
+                </table>
+            </div>
+            
+            <h3>🎯 Detected Shells</h3>";
+            
+            foreach ($this->foundShells as $shell) {
+                $confidenceClass = $shell['confidence'] >= 80 ? 'confidence-high' : 
+                                 ($shell['confidence'] >= 60 ? 'confidence-medium' : 'confidence-low');
+                $signatures = implode(', ', array_slice($shell['signatures'], 0, 10));
+                
+                $html .= "
+                <div class=\"shell-item $confidenceClass\">
+                    <h4>🚨 {$shell['url']}</h4>
+                    <p><strong>Confidence:</strong> {$shell['confidence']}%</p>
+                    <p><strong>Status Code:</strong> {$shell['status_code']}</p>
+                    <p><strong>Content Length:</strong> {$shell['content_length']} bytes</p>
+                    <p><strong>Response Time:</strong> " . number_format($shell['response_time'], 3) . "s</p>
+                    <p><strong>Signatures Found:</strong> $signatures</p>
+                </div>";
+            }
+        } else {
+            $html .= "
+            <div class=\"success\">
+                <h2>✅ No C99 Shells Detected</h2>
+                <p>The scan completed successfully with no web shells found on the target systems.</p>
+            </div>";
+        }
+        
+        $html .= "
+            <div class=\"footer\">
+                <p><strong>Disclaimer:</strong> This scan was performed for authorized security testing purposes only.</p>
+                <p><strong>Tool:</strong> C99 Shell Scanner v1.0 - PHP Edition</p>
+                <p><strong>Generated:</strong> $currentTime</p>
+                <p><strong>Note:</strong> Manual verification is recommended for all findings.</p>
+            </div>
+        </body>
+        </html>";
+        
+        return $html;
+    }
+    
+    /**
      * Scan IP range for C99 shells
      */
     public function scanRange($ipRange, $ports = [80, 443, 8080, 8443, 8000, 8888]) {
@@ -286,9 +424,13 @@ class C99Scanner {
         echo "[*] Using {$this->threads} processes\n";
         echo "[*] Timeout: {$this->timeout}s\n";
         echo "[*] Ports: " . implode(', ', $ports) . "\n";
+        if ($this->emailConfig) {
+            echo "[*] Email reports will be sent to: " . implode(', ', $this->emailConfig['recipient_emails']) . "\n";
+        }
         echo str_repeat('-', 60) . "\n";
         
-        $startTime = microtime(true);
+        $this->scanStartTime = microtime(true);
+        $startTime = $this->scanStartTime;
         
         // Split IPs into chunks for parallel processing
         $chunks = array_chunk($ips, ceil(count($ips) / $this->threads));
@@ -329,6 +471,12 @@ class C99Scanner {
                 echo "    {$shell['url']} (Confidence: {$shell['confidence']}%)\n";
             }
         }
+        
+        // Send email report
+        if ($this->emailConfig) {
+            echo "\n[*] Sending email report...\n";
+            $this->sendEmailReport($ipRange, $elapsed, count($ips));
+        }
     }
 }
 
@@ -364,11 +512,14 @@ function displayUsage() {
     echo "  --user-agent <ua>       Custom User-Agent string\n";
     echo "  --output <file>         Output file for results\n";
     echo "  --delay <sec>           Delay between requests in seconds (default: 0)\n";
+    echo "  --email-to <emails>     Recipient email addresses (space-separated)\n";
+    echo "  --email-from <email>    Sender email address\n";
     echo "  --help                  Show this help message\n\n";
     echo "Examples:\n";
     echo "  php c99_scanner.php --target 192.168.1.0/24\n";
     echo "  php c99_scanner.php --target 10.0.0.1 --ports 80,443,8080 --threads 10\n";
-    echo "  php c99_scanner.php --target 192.168.1.0/24 --output results.txt --delay 0.5\n\n";
+    echo "  php c99_scanner.php --target 192.168.1.0/24 --output results.txt --delay 0.5\n";
+    echo "  php c99_scanner.php --target 192.168.1.0/24 --email-to admin@lab.com security@lab.com --email-from scanner@lab.com\n\n";
 }
 
 /**
@@ -422,6 +573,19 @@ function main($argv) {
     $outputFile = isset($args['output']) ? $args['output'] : null;
     $delay = isset($args['delay']) ? (float)$args['delay'] : 0;
     
+    // Setup email configuration
+    $emailConfig = null;
+    if (isset($args['email-to']) && isset($args['email-from'])) {
+        $recipients = explode(' ', $args['email-to']);
+        $emailConfig = [
+            'recipient_emails' => $recipients,
+            'sender_email' => $args['email-from']
+        ];
+    } elseif (isset($args['email-to'])) {
+        echo "[!] Warning: Email recipients specified but missing sender email\n";
+        echo "[!] Email reports will be disabled\n";
+    }
+    
     echo "[*] Target: $target\n";
     echo "[*] Ports: " . implode(', ', $ports) . "\n";
     echo "[*] Threads: $threads\n";
@@ -429,13 +593,16 @@ function main($argv) {
     if ($outputFile) {
         echo "[*] Output: $outputFile\n";
     }
+    if ($emailConfig) {
+        echo "[*] Email reports: Enabled (" . count($emailConfig['recipient_emails']) . " recipients)\n";
+    }
     if ($delay > 0) {
         echo "[*] Delay: {$delay}s\n";
     }
     echo "\n";
     
     // Initialize scanner
-    $scanner = new C99Scanner($threads, $timeout, $userAgent, $outputFile, $delay);
+    $scanner = new C99Scanner($threads, $timeout, $userAgent, $outputFile, $delay, $emailConfig);
     
     // Start scanning
     try {

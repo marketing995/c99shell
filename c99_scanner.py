@@ -17,12 +17,18 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 import sys
 import json
 from datetime import datetime
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+import os
 
 # Disable SSL warnings for lab testing
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 class C99Scanner:
-    def __init__(self, threads=50, timeout=10, user_agent=None, output_file=None):
+    def __init__(self, threads=50, timeout=10, user_agent=None, output_file=None, email_config=None):
         self.threads = threads
         self.timeout = timeout
         self.session = requests.Session()
@@ -30,6 +36,8 @@ class C99Scanner:
         self.found_shells = []
         self.lock = threading.Lock()
         self.output_file = output_file
+        self.email_config = email_config
+        self.scan_start_time = None
         
         # Common C99 shell paths and filenames
         self.c99_paths = [
@@ -208,6 +216,146 @@ class C99Scanner:
         except Exception as e:
             print(f"Error saving result: {e}")
 
+    def send_email_report(self, scan_target, scan_duration, total_hosts):
+        """Send email report with scan results"""
+        if not self.email_config:
+            return
+
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            msg['From'] = self.email_config['sender_email']
+            msg['To'] = ', '.join(self.email_config['recipient_emails'])
+            msg['Subject'] = f"C99 Shell Scanner Report - {scan_target}"
+
+            # Create HTML email body
+            html_body = self.generate_html_report(scan_target, scan_duration, total_hosts)
+            msg.attach(MIMEText(html_body, 'html'))
+
+            # Create JSON report attachment if shells found
+            if self.found_shells:
+                json_report = json.dumps(self.found_shells, indent=2)
+                attachment = MIMEBase('application', 'json')
+                attachment.set_payload(json_report.encode())
+                encoders.encode_base64(attachment)
+                attachment.add_header(
+                    'Content-Disposition',
+                    f'attachment; filename="c99_scan_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json"'
+                )
+                msg.attach(attachment)
+
+            # Send email
+            server = smtplib.SMTP(self.email_config['smtp_server'], self.email_config['smtp_port'])
+            
+            if self.email_config.get('use_tls', True):
+                server.starttls()
+            
+            if self.email_config.get('smtp_username') and self.email_config.get('smtp_password'):
+                server.login(self.email_config['smtp_username'], self.email_config['smtp_password'])
+            
+            server.send_message(msg)
+            server.quit()
+            
+            print(f"[+] Email report sent to: {', '.join(self.email_config['recipient_emails'])}")
+            
+        except Exception as e:
+            print(f"[-] Error sending email report: {e}")
+
+    def generate_html_report(self, scan_target, scan_duration, total_hosts):
+        """Generate HTML email report"""
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <style>
+                body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                .header {{ background-color: #f0f0f0; padding: 20px; border-radius: 5px; }}
+                .summary {{ background-color: #e7f3ff; padding: 15px; margin: 20px 0; border-radius: 5px; }}
+                .alert {{ background-color: #ffebee; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 5px solid #f44336; }}
+                .success {{ background-color: #e8f5e8; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 5px solid #4caf50; }}
+                .shell-item {{ background-color: #fff3cd; padding: 10px; margin: 10px 0; border-radius: 3px; border-left: 3px solid #ffc107; }}
+                .confidence-high {{ border-left-color: #dc3545; }}
+                .confidence-medium {{ border-left-color: #fd7e14; }}
+                .confidence-low {{ border-left-color: #ffc107; }}
+                table {{ width: 100%; border-collapse: collapse; margin: 20px 0; }}
+                th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+                th {{ background-color: #f2f2f2; }}
+                .footer {{ margin-top: 30px; padding: 20px; background-color: #f9f9f9; border-radius: 5px; font-size: 12px; color: #666; }}
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🔍 C99 Shell Scanner Report</h1>
+                <p><strong>Scan Target:</strong> {scan_target}</p>
+                <p><strong>Scan Date:</strong> {current_time}</p>
+                <p><strong>Duration:</strong> {scan_duration:.2f} seconds</p>
+                <p><strong>Hosts Scanned:</strong> {total_hosts}</p>
+            </div>
+        """
+
+        if self.found_shells:
+            html += f"""
+            <div class="alert">
+                <h2>⚠️ SECURITY ALERT: C99 Shells Detected!</h2>
+                <p><strong>{len(self.found_shells)} potential web shells found</strong></p>
+            </div>
+
+            <div class="summary">
+                <h3>📊 Detection Summary</h3>
+                <table>
+                    <tr><th>Confidence Level</th><th>Count</th></tr>
+            """
+            
+            high_conf = len([s for s in self.found_shells if s['confidence'] >= 80])
+            med_conf = len([s for s in self.found_shells if 60 <= s['confidence'] < 80])
+            low_conf = len([s for s in self.found_shells if s['confidence'] < 60])
+            
+            html += f"""
+                    <tr><td>High (80%+)</td><td style="color: #dc3545; font-weight: bold;">{high_conf}</td></tr>
+                    <tr><td>Medium (60-79%)</td><td style="color: #fd7e14; font-weight: bold;">{med_conf}</td></tr>
+                    <tr><td>Low (50-59%)</td><td style="color: #ffc107; font-weight: bold;">{low_conf}</td></tr>
+                </table>
+            </div>
+
+            <h3>🎯 Detected Shells</h3>
+            """
+            
+            for shell in self.found_shells:
+                confidence_class = "confidence-high" if shell['confidence'] >= 80 else "confidence-medium" if shell['confidence'] >= 60 else "confidence-low"
+                
+                html += f"""
+                <div class="shell-item {confidence_class}">
+                    <h4>🚨 {shell['url']}</h4>
+                    <p><strong>Confidence:</strong> {shell['confidence']}%</p>
+                    <p><strong>Status Code:</strong> {shell['status_code']}</p>
+                    <p><strong>Content Length:</strong> {shell['content_length']} bytes</p>
+                    <p><strong>Response Time:</strong> {shell['response_time']:.3f}s</p>
+                    <p><strong>Signatures Found:</strong> {', '.join(shell['signatures'][:10])}</p>
+                </div>
+                """
+        else:
+            html += """
+            <div class="success">
+                <h2>✅ No C99 Shells Detected</h2>
+                <p>The scan completed successfully with no web shells found on the target systems.</p>
+            </div>
+            """
+
+        html += f"""
+            <div class="footer">
+                <p><strong>Disclaimer:</strong> This scan was performed for authorized security testing purposes only.</p>
+                <p><strong>Tool:</strong> C99 Shell Scanner v1.0</p>
+                <p><strong>Generated:</strong> {current_time}</p>
+                <p><strong>Note:</strong> Manual verification is recommended for all findings.</p>
+            </div>
+        </body>
+        </html>
+        """
+        
+        return html
+
     def scan_range(self, ip_range, ports=[80, 443, 8080, 8443, 8000, 8888]):
         """Scan IP range for C99 shells"""
         ips = self.expand_ip_range(ip_range)
@@ -215,9 +363,12 @@ class C99Scanner:
         print(f"[*] Using {self.threads} threads")
         print(f"[*] Timeout: {self.timeout}s")
         print(f"[*] Ports: {ports}")
+        if self.email_config:
+            print(f"[*] Email reports will be sent to: {', '.join(self.email_config['recipient_emails'])}")
         print("-" * 60)
         
-        start_time = time.time()
+        self.scan_start_time = time.time()
+        start_time = self.scan_start_time
         
         with ThreadPoolExecutor(max_workers=self.threads) as executor:
             future_to_ip = {executor.submit(self.scan_host, ip, ports): ip for ip in ips}
@@ -240,6 +391,11 @@ class C99Scanner:
             print("\n[+] Summary of findings:")
             for shell in self.found_shells:
                 print(f"    {shell['url']} (Confidence: {shell['confidence']}%)")
+        
+        # Send email report
+        if self.email_config:
+            print(f"\n[*] Sending email report...")
+            self.send_email_report(ip_range, elapsed, len(ips))
 
 def main():
     parser = argparse.ArgumentParser(
@@ -261,6 +417,22 @@ def main():
                         help='Output file for results')
     parser.add_argument('--delay', type=float, default=0,
                         help='Delay between requests in seconds')
+    
+    # Email options
+    parser.add_argument('--email-to', nargs='+',
+                        help='Recipient email addresses for reports')
+    parser.add_argument('--email-from',
+                        help='Sender email address')
+    parser.add_argument('--smtp-server',
+                        help='SMTP server address')
+    parser.add_argument('--smtp-port', type=int, default=587,
+                        help='SMTP server port (default: 587)')
+    parser.add_argument('--smtp-username',
+                        help='SMTP username for authentication')
+    parser.add_argument('--smtp-password',
+                        help='SMTP password for authentication')
+    parser.add_argument('--no-tls', action='store_true',
+                        help='Disable TLS for SMTP connection')
     
     args = parser.parse_args()
     
@@ -285,12 +457,30 @@ def main():
     Use only in authorized lab environments!
     """)
     
+    # Setup email configuration
+    email_config = None
+    if args.email_to and args.email_from and args.smtp_server:
+        email_config = {
+            'recipient_emails': args.email_to,
+            'sender_email': args.email_from,
+            'smtp_server': args.smtp_server,
+            'smtp_port': args.smtp_port,
+            'smtp_username': args.smtp_username,
+            'smtp_password': args.smtp_password,
+            'use_tls': not args.no_tls
+        }
+    elif args.email_to:
+        print("[!] Warning: Email recipients specified but missing SMTP configuration")
+        print("[!] Email reports will be disabled")
+    
     print(f"[*] Target: {args.target}")
     print(f"[*] Ports: {ports}")
     print(f"[*] Threads: {args.threads}")
     print(f"[*] Timeout: {args.timeout}s")
     if args.output:
         print(f"[*] Output: {args.output}")
+    if email_config:
+        print(f"[*] Email reports: Enabled ({len(email_config['recipient_emails'])} recipients)")
     print()
     
     # Initialize scanner
@@ -298,7 +488,8 @@ def main():
         threads=args.threads,
         timeout=args.timeout,
         user_agent=args.user_agent,
-        output_file=args.output
+        output_file=args.output,
+        email_config=email_config
     )
     
     # Add delay if specified
