@@ -1,0 +1,56 @@
+{
+    "scanner_settings": {
+        "default_threads": 50,
+        "default_timeout": 10,
+        "default_ports": [80, 443, 8080, 8443, 8000, 8888, 3000, 5000, 9000],
+        "max_threads": 200,
+        "min_confidence": 50,
+        "follow_redirects": true,
+        "verify_ssl": false
+    },
+    "detection_settings": {
+        "signature_threshold": 3,
+        "php_indicator_threshold": 2,
+        "file_ops_threshold": 2,
+        "shell_cmd_threshold": 2,
+        "enable_content_analysis": true,
+        "enable_header_analysis": true,
+        "enable_response_time_analysis": false
+    },
+    "output_settings": {
+        "save_full_response": false,
+        "save_headers": true,
+        "save_response_time": true,
+        "format": "json",
+        "timestamp_format": "ISO8601"
+    },
+    "rate_limiting": {
+        "requests_per_second": 10,
+        "burst_size": 50,
+        "backoff_factor": 1.5,
+        "max_retries": 3
+    },
+    "user_agents": [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:89.0) Gecko/20100101 Firefox/89.0",
+        "Mozilla/5.0 (X11; Linux x86_64; rv:89.0) Gecko/20100101 Firefox/89.0"
+    ],
+    "advanced_paths": [
+        "wp-admin/includes/",
+        "wp-content/themes/",
+        "wp-content/plugins/",
+        "administrator/components/",
+        "administrator/modules/",
+        "sites/default/files/",
+        "application/cache/",
+        "application/logs/",
+        "var/www/html/",
+        "public_html/",
+        "htdocs/",
+        "web/",
+        "wwwroot/"
+    ]
+}
