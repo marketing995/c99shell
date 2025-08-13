@@ -1,44 +1,44 @@
 <?php
 /**
- * C99 Shell Scanner - Web Interface
- * Secure web-based scanner for authorized penetration testing
+ * C99 Shell Scanner - Web Interface for cPanel/Shared Hosting
+ * Optimized for shared hosting environments
  */
 
-// Security check - only allow access from authorized IPs (customize as needed)
-$authorized_ips = [
-    '127.0.0.1',
-    '::1',
-    // Add your lab IPs here
-    // '192.168.1.0/24',
-    // '10.0.0.0/8'
-];
+// Load configuration
+$config = include 'config.php';
 
-function is_authorized_ip($ip, $authorized_ranges) {
-    foreach ($authorized_ranges as $range) {
-        if (strpos($range, '/') !== false) {
-            // CIDR notation
-            list($subnet, $mask) = explode('/', $range);
-            if ((ip2long($ip) & (~((1 << (32 - $mask)) - 1))) == ip2long($subnet)) {
-                return true;
-            }
+// Set security headers
+setSecurityHeaders($config);
+
+// Check IP authorization
+$client_ip = getClientIP();
+if (!checkIPAuthorization($client_ip, $config['authorized_ips'])) {
+    http_response_code(403);
+    die('Access denied. Your IP address (' . htmlspecialchars($client_ip) . ') is not authorized.');
+}
+
+// Password authentication (if enabled)
+session_start();
+if ($config['enable_password']) {
+    if (!isset($_SESSION['authenticated'])) {
+        if ($_POST['password'] ?? '' === $config['password']) {
+            $_SESSION['authenticated'] = true;
         } else {
-            // Single IP
-            if ($ip === $range) {
-                return true;
+            if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+                $error_message = 'Invalid password';
             }
+            include 'login_form.php';
+            exit;
         }
     }
-    return false;
 }
 
-$client_ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-if (!is_authorized_ip($client_ip, $authorized_ips)) {
-    http_response_code(403);
-    die('Access denied. Unauthorized IP address.');
-}
+// Set resource limits for shared hosting
+ini_set('memory_limit', $config['memory_limit']);
+set_time_limit($config['max_execution_time']);
 
-// Include the scanner class
-require_once '../c99_scanner.php';
+// Include simplified scanner class
+require_once 'shared_hosting_scanner.php';
 
 // Handle AJAX requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
